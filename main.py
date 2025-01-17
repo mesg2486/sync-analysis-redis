@@ -18,7 +18,7 @@ from decimal import Decimal
 
 if __name__ == '__main__':
     NO_MESSAGE_COUNT = 0 
-    Z_POP_KEY = 'video-analysis'
+    Z_POP_KEY = 'SingleModelPreProcess'
     Z_INFO_SEP = ':'
     cache_dir = "./data"
     raw_input_dir = "./raw"

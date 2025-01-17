@@ -11,6 +11,7 @@ import json
 import traceback
 import redis
 import os
+import csv
 
 # Configure logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S %Z')
@@ -212,53 +213,137 @@ def download_s3_resource(resource_path, base_cache_dir, bucket_name='sync5'):
         log = traceback.format_exc()
         logging.error(log)
 
+def convert_speaker_labels(input_path, output_path):
+    """
+    Converts speaker labels in a CSV file from 'speaker_XX' to 'userXX'.
+    
+    Args:
+        input_path (str): Path to the input CSV file.
+        output_path (str): Path to save the updated CSV file.
+    """
+    try:
+        with open(input_path, 'r') as infile, open(output_path, 'w', newline='') as outfile:
+            reader = csv.reader(infile)
+            writer = csv.writer(outfile)
+
+            headers = next(reader)  # Read the header row
+            writer.writerow(headers)  # Write the header row
+
+            for row in reader:
+                if 'Speaker' in headers:
+                    speaker_idx = headers.index('Speaker')
+                    row[speaker_idx] = row[speaker_idx].replace('speaker_', 'user')
+                writer.writerow(row)
+
+        logging.info(f"Converted speaker labels and saved to {output_path}.")
+    except Exception as e:
+        logging.error(f"Error converting speaker labels for {input_path}: {e}")
+        logging.error(traceback.format_exc())
+
 def upload_selected_files_to_endpoint(meeting_id, data_folder):
     try:
         # Extract the numeric ID from the meeting ID
         id_ = re.findall(r'\d+', meeting_id)[0]
         base_url = 'http://54.215.45.218:8080/s3/uploadByMeeting/'
         url = f"{base_url}{id_}"
-        
+
         # Allowed file extensions
         allowed_extensions = {'.txt', '.jpg', '.csv', '.json'}
-        
+
+        # Mapping for renaming files during upload
+        rename_map = {
+            'transcription.txt': 'ASR.txt',
+            'dialogue.txt': 'nlp_result.txt',
+            'diarization.txt': 'SpeakerDiarization.txt',
+            'emotion.txt': 'EmotionText.txt',
+        }
+
+        # Files to exclude
+        excluded_files = {'output.json', 'wav'}
+
         logging.info(f"Uploading files to endpoint {url}...")
-        
-        # Iterate through all files in the data folder
+
+        # Helper function to convert speaker labels in CSV files
+        def convert_speaker_labels(file_path):
+            temp_file = file_path + '.tmp'
+            with open(file_path, 'r') as infile, open(temp_file, 'w', newline='') as outfile:
+                reader = csv.reader(infile)
+                writer = csv.writer(outfile)
+
+                header = next(reader)
+                new_header = [col.replace('speaker_', 'user') for col in header]
+                writer.writerow(new_header)
+
+                for row in reader:
+                    writer.writerow(row)
+
+            os.replace(temp_file, file_path)
+
+        # Helper function to convert user headers in specific CSV files
+        def convert_user_headers(file_path):
+            temp_file = file_path + '.tmp'
+            with open(file_path, 'r') as infile, open(temp_file, 'w', newline='') as outfile:
+                reader = csv.reader(infile)
+                writer = csv.writer(outfile)
+
+                header = next(reader)
+                new_header = [re.sub(r'user_(\d+)', lambda m: f'user{int(m.group(1)):02d}', col) for col in header]
+                writer.writerow(new_header)
+
+                for row in reader:
+                    writer.writerow(row)
+
+            os.replace(temp_file, file_path)
+
+        # Process files in the data folder
         for file_name in os.listdir(data_folder):
             file_path = os.path.join(data_folder, file_name)
-            
+
             # Skip directories
             if os.path.isdir(file_path):
                 continue
 
-            # Check file extension
+            # Check file extension and excluded files
             _, file_extension = os.path.splitext(file_name)
-            if file_extension.lower() not in allowed_extensions:
-                logging.info(f"Skipping unsupported file: {file_name}")
+            if file_extension.lower() not in allowed_extensions or file_name in excluded_files:
+                logging.info(f"Skipping unsupported or excluded file: {file_name}")
                 continue
+
+            # Convert speaker labels for specific files
+            if file_name in {'dialogue.txt', 'diarization.txt', 'emotion.txt'}:
+                logging.info(f"Converting speaker labels in: {file_name}")
+                convert_speaker_labels(file_path)
+
+            # Convert user headers for specific CSV files
+            if file_name in {'a_results.csv', 'anchor_results.csv', 'rppg_results.csv', 'v_results.csv'}:
+                logging.info(f"Converting user headers in: {file_name}")
+                convert_user_headers(file_path)
+
+            # Get the renamed file name if applicable
+            upload_name = rename_map.get(file_name, file_name)
 
             try:
                 # Upload the file to the endpoint
-                logging.info(f"Uploading file: {file_name}")
+                logging.info(f"Uploading file: {file_name} as {upload_name}")
                 with open(file_path, 'rb') as file:
-                    files = {'file': file}
+                    files = {'file': (upload_name, file)}
                     response = requests.post(url, files=files)
-                    
+
                 if response.ok:
-                    logging.info(f"File Upload Success: {file_name} \n:::: {response.text}")
+                    logging.info(f"File Upload Success: {upload_name} \n:::: {response.text}")
                 else:
-                    logging.error(f"File Upload Error: {file_name} \n:::: {response.status_code} {response.text}")
+                    logging.error(f"File Upload Error: {upload_name} \n:::: {response.status_code} {response.text}")
 
             except Exception as e:
                 logging.error(f"Failed to upload {file_name}: {e}")
                 logging.error(traceback.format_exc())
-        
+
         logging.info("File upload process complete.")
+
     except Exception as e:
         logging.error("Error during file upload process:")
         logging.error(traceback.format_exc())
-        
+
         
 # remove double quotes from the string
 def remove_quotes(input_string):
