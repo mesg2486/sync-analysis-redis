@@ -1,7 +1,6 @@
 boto3
 requests
 redis
-uuid
 torch
 openai-whisper
 pandas

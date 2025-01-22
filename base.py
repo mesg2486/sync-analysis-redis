@@ -27,7 +27,7 @@ meetings_queue_url = 'https://sqs.us-east-2.amazonaws.com/243371732145/MeetingsQ
 cloudfront_base_url = 'https://d2n2ldezfv2tlg.cloudfront.net'
 
 # S3 
-s3_endpoint = 'https://s3.us-east-2.amazonaws.com'
+s3_endpoint = 'https://s3.us-west-1.amazonaws.com'
 
 # Initialize SQS client with AWS credentials
 boto = boto3.Session(
@@ -323,16 +323,22 @@ def upload_selected_files_to_endpoint(meeting_id, data_folder):
             upload_name = rename_map.get(file_name, file_name)
 
             try:
-                # Upload the file to the endpoint
-                logging.info(f"Uploading file: {file_name} as {upload_name}")
-                with open(file_path, 'rb') as file:
-                    files = {'file': (upload_name, file)}
-                    response = requests.post(url, files=files)
-
-                if response.ok:
-                    logging.info(f"File Upload Success: {upload_name} \n:::: {response.text}")
+                # Check if the file should be directly uploaded to S3
+                if file_name in {'transcription.txt', 'diarization.csv', 'emotion.txt'} or file_extension.lower() == '.jpg':
+                    s3_key = f"test/{meeting_id}/{rename_map.get(file_name, file_name)}"
+                    logging.info(f"Uploading file directly to S3: {file_path} -> {s3_key}")
+                    upload_resource(file_path, s3_key, "sync5")
                 else:
-                    logging.error(f"File Upload Error: {upload_name} \n:::: {response.status_code} {response.text}")
+                    # Upload the file to the endpoint
+                    logging.info(f"Uploading file: {file_name} as {upload_name}")
+                    with open(file_path, 'rb') as file:
+                        files = {'file': (upload_name, file)}
+                        response = requests.post(url, files=files)
+
+                    if response.ok:
+                        logging.info(f"File Upload Success: {upload_name} \n:::: {response.text}")
+                    else:
+                        logging.error(f"File Upload Error: {upload_name} \n:::: {response.status_code} {response.text}")
 
             except Exception as e:
                 logging.error(f"Failed to upload {file_name}: {e}")
