@@ -17,13 +17,13 @@ from speaker import diarization
 from decimal import Decimal
 
 if __name__ == '__main__':
-    NO_MESSAGE_COUNT = 0 
     Z_POP_KEY = 'SingleModelPreProcess'
     Z_INFO_SEP = ':'
     cache_dir = "./data"
     raw_input_dir = "./raw"
     asr_path = "./data/transcription.txt"
     diarization_path = "./data/diarization.txt"
+    IDLE_COUNT = 0
     
     while True:
         local_cached_video_path=""
@@ -31,9 +31,15 @@ if __name__ == '__main__':
         
         resource_info = base.redis_instance.zpopmin(Z_POP_KEY)
         # [(b'meeting146:test/video/gitlab_video_2.mp4:0.6', 1709577847.4095476)]
+        
+        if IDLE_COUNT > 5: 
+            res = requests.get("https://z7n6sy6bqbgq4hmuapnsvdjko40nknxl.lambda-url.us-east-2.on.aws/lts/stop/analysis")
+            print(res)
+            break
 
         if len(resource_info) < 1:
             IS_LOCKED = 0
+            IDLE_COUNT+=1
             logging.info('empty redis')
             time.sleep(20);
         else:
