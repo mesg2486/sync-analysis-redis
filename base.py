@@ -244,7 +244,7 @@ def upload_selected_files_to_endpoint(meeting_id, data_folder):
     try:
         # Extract the numeric ID from the meeting ID
         id_ = re.findall(r'\d+', meeting_id)[0]
-        base_url = 'http://54.215.45.218:8080/s3/uploadByMeeting/'
+        base_url = 'http://18.144.100.85:8080/s3/uploadByMeeting/'
         url = f"{base_url}{id_}"
 
         # Allowed file extensions
@@ -364,7 +364,7 @@ def remove_quotes(input_string):
 
 # RETURN THE REDIS CLIENT INSTANCE
 def get_redis_instance():
-    pool = redis.ConnectionPool(host="54.215.45.218", port=6379, db=0)
+    pool = redis.ConnectionPool(host="18.144.100.85", password="123456", port=6379, db=0)
     redis_instance = redis.StrictRedis(connection_pool=pool)
     return redis_instance
 

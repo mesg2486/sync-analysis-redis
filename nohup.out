@@ -36,7 +36,11 @@ ModuleNotFoundError: No module named 'redis'
 2025-01-17 19:04:09 UTC - INFO - Processing heatmap...
 2025-01-17 19:04:10 UTC - INFO - Extracting audio from './data/dea57ca8796d4a84a5866c4feacbd657' to './data/dea57ca8796d4a84a5866c4feacbd657.wav'
 MoviePy - Writing audio in ./data/dea57ca8796d4a84a5866c4feacbd657.wav
-chunk:   0%|          | 0/718 [00:00<?, ?it/s, now=None]chunk:  72%|███████▏  | 516/718 [00:00<00:00, 5155.41it/s, now=None]                                                                    MoviePy - Done.
+
+chunk:   0%|          | 0/718 [00:00<?, ?it/s, now=None]
+chunk:  72%|███████▏  | 516/718 [00:00<00:00, 5155.41it/s, now=None]
+                                                                    
+MoviePy - Done.
 2025-01-17 19:04:10 UTC - INFO - Audio successfully extracted to './data/dea57ca8796d4a84a5866c4feacbd657.wav'
 2025-01-17 19:04:10 UTC - INFO - Generating transcript...
 2025-01-17 19:04:40 UTC - WARNING - /home/ubuntu/anaconda3/envs/syneurgy/lib/python3.11/site-packages/whisper/__init__.py:150: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
@@ -82,7 +86,7 @@ speaker_stats {'speaker_02': {'total_words': 30, 'total_duration_minutes': 0.208
 fnal {'speaker_02': 144.23076923076923, 'speaker_00': 130.66202090592336}
 speakers_time: [Decimal('12.4800'), Decimal('11.4800')]
 total_time: 23.96
-acts_time: [Decimal('8.160'), Decimal('0.000'), Decimal('0.000'), Decimal('15.800'), Decimal('0.000'), Decimal('0.000'), Decimal('0.000')]
+acts_time: [Decimal('8.160'), Decimal('0.000'), Decimal('0.000'), De18.144.100.85'), Decimal('0.000'), Decimal('0.000'), Decimal('0.000')]
 emotions_time: [Decimal('0.000'), Decimal('0.000'), Decimal('23.960')]
 sentences_array: [' including youtube videos and solution pages and so on. so yeah, i think we will just link to that from both the use this page and', ' and the sales people', " cool. then we're a little bit over time.", " i really want to just chat about item for quickly and maybe i'll open an issue about"]
 2025-01-17 19:05:16 UTC - ERROR - Meeting with ID meeting200 not found.
@@ -20462,9 +20466,12 @@ sentences_array: [' including youtube videos and solution pages and so on. so ye
 2025-01-22 12:12:17 UTC - INFO - Processing heatmap...
 2025-01-22 12:12:17 UTC - INFO - Extracting audio from './data/8164f044ec444a259e1e7901c05b25f3' to './data/8164f044ec444a259e1e7901c05b25f3.wav'
 MoviePy - Writing audio in ./data/8164f044ec444a259e1e7901c05b25f3.wav
-chunk:   0%|          | 0/718 [00:00<?, ?it/s, now=None]chunk:  72%|███████▏  | 519/718 [00:00<00:00, 5185.48it/s, now=None]                                                                    MoviePy - Done.
+
+chunk:   0%|          | 0/718 [00:00<?, ?it/s, now=None]
+chunk:  72%|███████▏  | 519/718 [00:00<00:00, 5185.48it/s, now=None]
+                                                                    
+MoviePy - Done.
 2025-01-22 12:12:17 UTC - INFO - Audio successfully extracted to './data/8164f044ec444a259e1e7901c05b25f3.wav'
 2025-01-22 12:12:17 UTC - INFO - Generating transcript...
 2025-01-22 12:12:45 UTC - WARNING - /home/ubuntu/anaconda3/envs/syneurgy/lib/python3.11/site-packages/whisper/__init__.py:150: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   checkpoint = torch.load(fp, map_location=device)
-

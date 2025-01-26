@@ -1,7 +1,7 @@
 import redis
 import time
 # Connect to a local Redis server with authentication
-pool = redis.ConnectionPool(host="54.215.45.218", port=6379, db=0)
+pool = redis.ConnectionPool(host="18.144.100.85", password="123456", port=6379, db=0)
 r = redis.StrictRedis(connection_pool= pool)
 # r = redis.Redis(host='18.144.11.243', port=6379, db=0, password='123456')
 
