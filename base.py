@@ -111,7 +111,7 @@ def request_stop_instance(group):
         logging.error(f"Error requesting stop of instance: {e}")
 
 # Download videos from s3
-def download_video(resource_path, base_cache_dir, bucket_name='sync5'):
+def download_video(resource_path, base_cache_dir, bucket_name='sync-dev-server'):
     try:
         logging.info(f"downloading... {resource_path}")
         start = time.time()
@@ -185,7 +185,7 @@ def get_s3_instance():
 
 
 # DOWNLOAD RAW VIDEO FROM S3
-def download_s3_resource(resource_path, base_cache_dir, bucket_name='sync5'):
+def download_s3_resource(resource_path, base_cache_dir, bucket_name='sync-dev-server'):
     try:
         logging.info(f"downloading... {resource_path}")
         start = time.time()
@@ -213,93 +213,208 @@ def download_s3_resource(resource_path, base_cache_dir, bucket_name='sync5'):
         log = traceback.format_exc()
         logging.error(log)
 
-def convert_speaker_labels(input_path, output_path):
+
+
+# Map files to their new names
+RENAME_MAP = {
+    'transcription.txt': 'ASR.txt',
+    'dialogue.txt': 'nlp_result.txt',
+    'diarization.txt': 'SpeakerDiarization.txt',
+    'emotion.txt': 'EmotionText.txt',
+    # Add more if you want to rename CSVs or other files
+    # 'some_old.csv': 'some_new.csv',
+}
+
+# For certain text files that are "CSV-like" but tab-delimited
+# (If your .txt files are comma-delimited, change to ',' instead of '\t')
+TAB_DELIMITED_FILES = {
+    'SpeakerDiarization.txt',
+    'EmotionText.txt',
+    'nlp_result.txt',         # If needed
+    'ASR.txt',                # If needed
+}
+
+def recreate_out_folder(data_folder: str) -> str:
+    """Recreate (remove if exists) the 'out' subfolder inside data_folder."""
+    out_folder = os.path.join(data_folder, 'out')
+    if os.path.exists(out_folder):
+        shutil.rmtree(out_folder)
+    os.makedirs(out_folder, exist_ok=True)
+    return out_folder
+
+
+def normalize_speaker_user_cell(text: str) -> str:
     """
-    Converts speaker labels in a CSV file from 'speaker_XX' to 'userXX'.
-    
-    Args:
-        input_path (str): Path to the input CSV file.
-        output_path (str): Path to save the updated CSV file.
+    For a given text (column header or cell):
+      - If it's exactly 'Speaker', rename to 'User'
+      - Else if it matches 'speaker_XX' or 'user_XX', convert to 'userXX' (zero-padded).
+    """
+    # 1) Handle exact 'Speaker' -> 'User'
+    if text == 'Speaker':
+        return 'User'
+
+    # 2) Handle 'speaker_XX' or 'user_XX' -> 'userXX'
+    match = re.match(r'^(speaker|user)_(\d+)$', text, flags=re.IGNORECASE)
+    if match:
+        user_id = int(match.group(2))  # the digits
+        # zero-pad
+        return f"user{user_id:02d}"
+
+    # Otherwise, return as-is
+    return text
+
+
+def convert_file_speaker_labels(input_file: str, output_file: str, delimiter: str):
+    """
+    Reads `input_file` (CSV or tab-delimited text) row by row, normalizes
+    anything matching 'speaker_XX'/'user_XX' → 'userXX', and writes to `output_file`.
+
+    Also renames header cells that are exactly 'Speaker' → 'User'.
     """
     try:
-        with open(input_path, 'r') as infile, open(output_path, 'w', newline='') as outfile:
-            reader = csv.reader(infile)
-            writer = csv.writer(outfile)
+        # CSV approach with chosen delimiter
+        with open(input_file, 'r', encoding='utf-8-sig', newline='') as infile, \
+             open(output_file, 'w', encoding='utf-8', newline='') as outfile:
 
-            headers = next(reader)  # Read the header row
-            writer.writerow(headers)  # Write the header row
+            reader = csv.reader(infile, delimiter=delimiter)
+            writer = csv.writer(outfile, delimiter=delimiter)
 
+            first_row = True
             for row in reader:
-                if 'Speaker' in headers:
-                    speaker_idx = headers.index('Speaker')
-                    row[speaker_idx] = row[speaker_idx].replace('speaker_', 'user')
-                writer.writerow(row)
+                # Convert each cell in the row
+                new_row = [normalize_speaker_user_cell(cell) for cell in row]
+                if first_row:
+                    # If there's something specifically about a blank first column
+                    # (like your example had an empty first cell), you can handle it here
+                    first_row = False
+                writer.writerow(new_row)
 
-        logging.info(f"Converted speaker labels and saved to {output_path}.")
+        logging.info(f"Converted speaker labels and saved to {output_file}.")
     except Exception as e:
-        logging.error(f"Error converting speaker labels for {input_path}: {e}")
+        logging.error(f"Error converting speaker labels for {input_file}: {e}")
         logging.error(traceback.format_exc())
 
-def upload_selected_files_to_endpoint(meeting_id, data_folder):
+
+def rename_avatar(old_name: str) -> str:
+    """
+    Convert 'user_0.jpg' → 'user00.jpg', 'user_11.jpg' → 'user11.jpg', etc.
+    Returns the new name or old_name if no match.
+    """
+    match = re.match(r"user_(\d+)\.jpg", old_name, flags=re.IGNORECASE)
+    if match:
+        user_id = int(match.group(1))
+        return f"user{user_id:02d}.jpg"
+    return old_name
+
+
+def prepare_final_files(data_folder: str) -> str:
+    """
+    1. Recreate out/ folder in data_folder.
+    2. Convert or rename files as needed, putting final results into out/.
+    3. Return the path to the out folder.
+    """
+    out_folder = recreate_out_folder(data_folder)
+
+    for file_name in os.listdir(data_folder):
+        file_path = os.path.join(data_folder, file_name)
+
+        # Skip directories
+        if os.path.isdir(file_path):
+            continue
+
+        # Skip excluded files (e.g., .wav, output.json, etc.)
+        if file_name.endswith('.wav') or file_name == 'output.json':
+            continue
+
+        # Determine the final name based on RENAME_MAP
+        final_name = RENAME_MAP.get(file_name, file_name)
+        out_file_path = os.path.join(out_folder, final_name)
+
+        # 1) If it's a JPG avatar, rename "user_0.jpg" -> "user00.jpg"
+        _, ext = os.path.splitext(file_name)
+        if ext.lower() == '.jpg' and file_name.startswith("user_"):
+            avatar_renamed = rename_avatar(final_name)
+            shutil.copy2(file_path, os.path.join(out_folder, avatar_renamed))
+            continue
+
+        # 2) If it ends with ".csv", parse as comma-delimited, fix speaker/user fields
+        if file_name.lower().endswith('.csv'):
+            convert_file_speaker_labels(
+                input_file=file_path,
+                output_file=out_file_path,
+                delimiter=','
+            )
+            continue
+
+        # 3) If it's a known tab-delimited file (like SpeakerDiarization.txt),
+        #    parse and fix speaker/user fields.
+        if final_name in TAB_DELIMITED_FILES:
+            convert_file_speaker_labels(
+                input_file=file_path,
+                output_file=out_file_path,
+                delimiter='\t'
+            )
+            continue
+
+        # 4) Otherwise, just copy the file without changes
+        shutil.copy2(file_path, out_file_path)
+
+    return out_folder
+
+
+def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
+    """
+    1. Prepare final files in the out/ folder (conversions + rename).
+    2. Upload them based on your existing logic:
+       - Avatars → avatar_url
+       - Some files → direct S3
+       - Others → main REST endpoint
+    """
     try:
+        # Prepare final files in out/
+        out_folder = prepare_final_files(data_folder)
+
         # Extract the numeric ID from the meeting ID
-        id_ = re.findall(r'\d+', meeting_id)[0]
+
+        # Endpoint for standard file uploads
         base_url = 'http://18.144.100.85:8080/s3/uploadByMeeting/'
-        url = f"{base_url}{id_}"
+        url = f"{base_url}{meeting_id}"
+
+        # Avatar upload endpoint
+        avatar_url = f"http://18.144.100.85:8080/video/avatar/{meeting_id}/"
 
         # Allowed file extensions
         allowed_extensions = {'.txt', '.jpg', '.csv', '.json'}
 
-        # Mapping for renaming files during upload
-        rename_map = {
-            'transcription.txt': 'ASR.txt',
-            'dialogue.txt': 'nlp_result.txt',
-            'diarization.txt': 'SpeakerDiarization.txt',
-            'emotion.txt': 'EmotionText.txt',
-        }
-
         # Files to exclude
         excluded_files = {'output.json', 'wav'}
 
-        logging.info(f"Uploading files to endpoint {url}...")
+        logging.info(f"Uploading files from '{out_folder}' to endpoint {url}...")
 
-        # Helper function to convert speaker labels in CSV files
-        def convert_speaker_labels(file_path):
-            temp_file = file_path + '.tmp'
-            with open(file_path, 'r') as infile, open(temp_file, 'w', newline='') as outfile:
-                reader = csv.reader(infile)
-                writer = csv.writer(outfile)
+        def upload_avatar(file_path: str, renamed_file_name: str):
+            """
+            Uploads avatar file to the specific avatar endpoint.
+            """
+            # Remove the extension for the URL:
+            avatar_name, ext = os.path.splitext(renamed_file_name)
+            avatar_upload_url = f"{avatar_url}{avatar_name}"
+            
+            logging.info(f"Uploading avatar to: {avatar_upload_url}")
+            with open(file_path, 'rb') as file:
+                files = {'file': (renamed_file_name, file)}
+                response = requests.post(avatar_upload_url, files=files)
 
-                header = next(reader)
-                new_header = [col.replace('speaker_', 'user') for col in header]
-                writer.writerow(new_header)
+            if response.ok:
+                logging.info(f"Avatar Upload Success: {renamed_file_name}")
+            else:
+                logging.error(f"Avatar Upload Error: {renamed_file_name} "
+                            f"\n:::: {response.status_code} {response.text}")
 
-                for row in reader:
-                    writer.writerow(row)
 
-            os.replace(temp_file, file_path)
+        # Process files in the out folder
+        for file_name in os.listdir(out_folder):
+            file_path = os.path.join(out_folder, file_name)
 
-        # Helper function to convert user headers in specific CSV files
-        def convert_user_headers(file_path):
-            temp_file = file_path + '.tmp'
-            with open(file_path, 'r') as infile, open(temp_file, 'w', newline='') as outfile:
-                reader = csv.reader(infile)
-                writer = csv.writer(outfile)
-
-                header = next(reader)
-                new_header = [re.sub(r'user_(\d+)', lambda m: f'user{int(m.group(1)):02d}', col) for col in header]
-                writer.writerow(new_header)
-
-                for row in reader:
-                    writer.writerow(row)
-
-            os.replace(temp_file, file_path)
-
-        # Process files in the data folder
-        for file_name in os.listdir(data_folder):
-            file_path = os.path.join(data_folder, file_name)
-
-            # Skip directories
             if os.path.isdir(file_path):
                 continue
 
@@ -309,36 +424,31 @@ def upload_selected_files_to_endpoint(meeting_id, data_folder):
                 logging.info(f"Skipping unsupported or excluded file: {file_name}")
                 continue
 
-            # Convert speaker labels for specific files
-            if file_name in {'dialogue.txt', 'diarization.txt', 'emotion.txt'}:
-                logging.info(f"Converting speaker labels in: {file_name}")
-                convert_speaker_labels(file_path)
+            # Handle avatar uploads (e.g., user00.jpg, user01.jpg, etc.)
+            if file_extension.lower() == '.jpg' and file_name.lower().startswith("user"):
+                upload_avatar(file_path, file_name)
+                continue
 
-            # Convert user headers for specific CSV files
-            if file_name in {'a_results.csv', 'anchor_results.csv', 'rppg_results.csv', 'v_results.csv'}:
-                logging.info(f"Converting user headers in: {file_name}")
-                convert_user_headers(file_path)
+            # If you want certain files to go directly to S3, do so here:
+            if file_name in {'ASR.txt', 'SpeakerDiarization.txt', 'EmotionText.txt', 'nlp_result.txt'}:
+                # Example S3 key: "test/<id_>/<filename>"
+                s3_key = f"test/{meeting_id}/{file_name}"
+                logging.info(f"Uploading file directly to S3: {file_path} -> {s3_key}")
+                # upload_resource(file_path, s3_key, "sync-dev-server")  # your actual S3 method
+                continue
 
-            # Get the renamed file name if applicable
-            upload_name = rename_map.get(file_name, file_name)
-
+            # Otherwise, upload to the main REST endpoint
             try:
-                # Check if the file should be directly uploaded to S3
-                if file_name in {'transcription.txt', 'diarization.csv', 'emotion.txt'} or file_extension.lower() == '.jpg':
-                    s3_key = f"test/{meeting_id}/{rename_map.get(file_name, file_name)}"
-                    logging.info(f"Uploading file directly to S3: {file_path} -> {s3_key}")
-                    upload_resource(file_path, s3_key, "sync5")
-                else:
-                    # Upload the file to the endpoint
-                    logging.info(f"Uploading file: {file_name} as {upload_name}")
-                    with open(file_path, 'rb') as file:
-                        files = {'file': (upload_name, file)}
-                        response = requests.post(url, files=files)
+                logging.info(f"Uploading file: {file_name} to {url}")
+                with open(file_path, 'rb') as file:
+                    files = {'file': (file_name, file)}
+                    response = requests.post(url, files=files)
 
-                    if response.ok:
-                        logging.info(f"File Upload Success: {upload_name} \n:::: {response.text}")
-                    else:
-                        logging.error(f"File Upload Error: {upload_name} \n:::: {response.status_code} {response.text}")
+                if response.ok:
+                    logging.info(f"File Upload Success: {file_name} \n:::: {response.text}")
+                else:
+                    logging.error(f"File Upload Error: {file_name} "
+                                  f"\n:::: {response.status_code} {response.text}")
 
             except Exception as e:
                 logging.error(f"Failed to upload {file_name}: {e}")
@@ -350,7 +460,11 @@ def upload_selected_files_to_endpoint(meeting_id, data_folder):
         logging.error("Error during file upload process:")
         logging.error(traceback.format_exc())
 
-        
+
+
+
+
+
 # remove double quotes from the string
 def remove_quotes(input_string):
     if input_string.startswith('"') and input_string.endswith('"'):
