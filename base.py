@@ -214,7 +214,6 @@ def download_s3_resource(resource_path, base_cache_dir, bucket_name='sync-dev-se
         logging.error(log)
 
 
-
 # Map files to their new names
 RENAME_MAP = {
     'transcription.txt': 'ASR.txt',
@@ -242,7 +241,6 @@ def recreate_out_folder(data_folder: str) -> str:
     os.makedirs(out_folder, exist_ok=True)
     return out_folder
 
-
 def normalize_speaker_user_cell(text: str) -> str:
     """
     For a given text (column header or cell):
@@ -263,7 +261,6 @@ def normalize_speaker_user_cell(text: str) -> str:
     # Otherwise, return as-is
     return text
 
-
 def convert_file_speaker_labels(input_file: str, output_file: str, delimiter: str):
     """
     Reads `input_file` (CSV or tab-delimited text) row by row, normalizes
@@ -272,7 +269,6 @@ def convert_file_speaker_labels(input_file: str, output_file: str, delimiter: st
     Also renames header cells that are exactly 'Speaker' → 'User'.
     """
     try:
-        # CSV approach with chosen delimiter
         with open(input_file, 'r', encoding='utf-8-sig', newline='') as infile, \
              open(output_file, 'w', encoding='utf-8', newline='') as outfile:
 
@@ -284,8 +280,6 @@ def convert_file_speaker_labels(input_file: str, output_file: str, delimiter: st
                 # Convert each cell in the row
                 new_row = [normalize_speaker_user_cell(cell) for cell in row]
                 if first_row:
-                    # If there's something specifically about a blank first column
-                    # (like your example had an empty first cell), you can handle it here
                     first_row = False
                 writer.writerow(new_row)
 
@@ -293,7 +287,6 @@ def convert_file_speaker_labels(input_file: str, output_file: str, delimiter: st
     except Exception as e:
         logging.error(f"Error converting speaker labels for {input_file}: {e}")
         logging.error(traceback.format_exc())
-
 
 def rename_avatar(old_name: str) -> str:
     """
@@ -305,7 +298,6 @@ def rename_avatar(old_name: str) -> str:
         user_id = int(match.group(1))
         return f"user{user_id:02d}.jpg"
     return old_name
-
 
 def prepare_final_files(data_folder: str) -> str:
     """
@@ -337,6 +329,25 @@ def prepare_final_files(data_folder: str) -> str:
             shutil.copy2(file_path, os.path.join(out_folder, avatar_renamed))
             continue
 
+        # SPECIAL CASE: anchor_results.csv => remove "user_" substring from lines
+        if file_name.lower() == 'anchor_results.csv':
+            try:
+                with open(file_path, 'r', encoding='utf-8') as infile, \
+                    open(out_file_path, 'w', encoding='utf-8') as outfile:
+                    for line in infile:
+                        # Replace user_(digits) => userXX (zero-padded)
+                        line = re.sub(
+                            r"user_(\d+)",
+                            lambda m: f"user{int(m.group(1)):02d}",
+                            line
+                        )
+                        outfile.write(line)
+                logging.info("Converted 'user_#' references in anchor_results.csv.")
+            except Exception as e:
+                logging.error(f"Failed to strip user_ from anchor_results.csv: {e}")
+                logging.error(traceback.format_exc())
+            continue
+        
         # 2) If it ends with ".csv", parse as comma-delimited, fix speaker/user fields
         if file_name.lower().endswith('.csv'):
             convert_file_speaker_labels(
@@ -361,7 +372,6 @@ def prepare_final_files(data_folder: str) -> str:
 
     return out_folder
 
-
 def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
     """
     1. Prepare final files in the out/ folder (conversions + rename).
@@ -373,15 +383,14 @@ def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
     try:
         # Prepare final files in out/
         out_folder = prepare_final_files(data_folder)
-
-        # Extract the numeric ID from the meeting ID
-
+        id_ = re.findall('\d+', meeting_id)[0]
+        
         # Endpoint for standard file uploads
         base_url = 'http://18.144.100.85:8080/s3/uploadByMeeting/'
-        url = f"{base_url}{meeting_id}"
+        url = f"{base_url}{id_}"
 
         # Avatar upload endpoint
-        avatar_url = f"http://18.144.100.85:8080/video/avatar/{meeting_id}/"
+        avatar_url = f"http://18.144.100.85:8080/video/avatar/{id_}/"
 
         # Allowed file extensions
         allowed_extensions = {'.txt', '.jpg', '.csv', '.json'}
@@ -408,8 +417,7 @@ def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
                 logging.info(f"Avatar Upload Success: {renamed_file_name}")
             else:
                 logging.error(f"Avatar Upload Error: {renamed_file_name} "
-                            f"\n:::: {response.status_code} {response.text}")
-
+                              f"\n:::: {response.status_code} {response.text}")
 
         # Process files in the out folder
         for file_name in os.listdir(out_folder):
@@ -431,10 +439,9 @@ def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
 
             # If you want certain files to go directly to S3, do so here:
             if file_name in {'ASR.txt', 'SpeakerDiarization.txt', 'EmotionText.txt', 'nlp_result.txt'}:
-                # Example S3 key: "test/<id_>/<filename>"
                 s3_key = f"test/{meeting_id}/{file_name}"
                 logging.info(f"Uploading file directly to S3: {file_path} -> {s3_key}")
-                # upload_resource(file_path, s3_key, "sync-dev-server")  # your actual S3 method
+                upload_resource(file_path, s3_key, "sync-dev-server")  # your actual S3 method
                 continue
 
             # Otherwise, upload to the main REST endpoint
@@ -459,10 +466,6 @@ def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
     except Exception as e:
         logging.error("Error during file upload process:")
         logging.error(traceback.format_exc())
-
-
-
-
 
 
 # remove double quotes from the string
