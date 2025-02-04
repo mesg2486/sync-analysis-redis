@@ -438,7 +438,7 @@ def upload_selected_files_to_endpoint(meeting_id: str, data_folder: str):
                 continue
 
             # If you want certain files to go directly to S3, do so here:
-            if file_name in {'ASR.txt', 'SpeakerDiarization.txt', 'EmotionText.txt', 'nlp_result.txt'}:
+            if file_name in {'ASR.txt', 'SpeakerDiarization.txt', 'EmotionText.txt'}:
                 s3_key = f"test/{meeting_id}/{file_name}"
                 logging.info(f"Uploading file directly to S3: {file_path} -> {s3_key}")
                 upload_resource(file_path, s3_key, "sync-dev-server")  # your actual S3 method

@@ -32,10 +32,10 @@ if __name__ == '__main__':
         resource_info = base.redis_instance.zpopmin(Z_POP_KEY)
         # [(b'meeting146:test/video/gitlab_video_2.mp4:0.6', 1709577847.4095476)]
         
-        # if IDLE_COUNT > 5: 
-        #     res = requests.get("https://z7n6sy6bqbgq4hmuapnsvdjko40nknxl.lambda-url.us-east-2.on.aws/lts/stop/analysis")
-        #     print(res)
-        #     break
+        if IDLE_COUNT > 5: 
+            res = requests.get("https://z7n6sy6bqbgq4hmuapnsvdjko40nknxl.lambda-url.us-east-2.on.aws/lts/stop/analysis")
+            print(res)
+            break
 
         if len(resource_info) < 1:
             IS_LOCKED = 0
