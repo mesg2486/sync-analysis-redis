@@ -1,17 +1,23 @@
 import redis
 import time
-# Connect to a local Redis server with authentication
-pool = redis.ConnectionPool(host="18.144.100.85", password="123456", port=6379, db=0)
-r = redis.StrictRedis(connection_pool= pool)
-# r = redis.Redis(host='18.144.11.243', port=6379, db=0, password='123456')
+from dotenv import load_dotenv
+import os
 
-zset_key = 'SingleModelPreProcess'
-# value = 'meeting14:test/video/trust_0126.mp4:0.6'
-value = 'meeting422:test/video/no_trust.mp4:0.6'
+# Load environment variables from .env file
+load_dotenv()
 
-# value = 'meeting157:test/video/1c5265f19d9990d9b7e00152f8742c98.mp4:0.6'
-# value1 = 'meeting147:test/video/gitlab_video_3.mp4:0.6'
-# value2 = 'meeting148:test/video/gitlab_video_4.mp4:0.6'
+# Connect to Redis server using environment variables
+pool = redis.ConnectionPool(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    password=os.getenv("REDIS_PASSWORD", ""),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=int(os.getenv("REDIS_DB", 0))
+)
+r = redis.StrictRedis(connection_pool=pool)
+
+zset_key = os.getenv("REDIS_ZSET_KEY", 'SingleModelPreProcess')
+value = os.getenv("REDIS_VALUE", 'meeting422:test/video/no_trust.mp4:0.6')
+
 score = time.time()  # Current time as timestamp
 
 r.zadd(zset_key, {value: score})

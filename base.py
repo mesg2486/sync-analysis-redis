@@ -12,22 +12,26 @@ import traceback
 import redis
 import os
 import csv
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S %Z')
 
+
 # SQS SETUP
-aws_access_key_id = 'AKIATRKQV5SYQTJ7DBGF'
-aws_secret_access_key = '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'
-aws_region = 'us-east-2'
+aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+aws_region = os.getenv('AWS_REGION', 'us-east-2')
 
 # SQS queue URL
-on_off_queue_url = 'https://sqs.us-east-2.amazonaws.com/243371732145/sync-main.fifo'
-meetings_queue_url = 'https://sqs.us-east-2.amazonaws.com/243371732145/MeetingsQueue.fifo'
-cloudfront_base_url = 'https://d2n2ldezfv2tlg.cloudfront.net'
+on_off_queue_url = os.getenv('ON_OFF_QUEUE_URL')
+meetings_queue_url = os.getenv('MEETINGS_QUEUE_URL')
+cloudfront_base_url = os.getenv('CLOUDFRONT_BASE_URL')
 
-# S3 
-s3_endpoint = 'https://s3.us-west-1.amazonaws.com'
+# S3
+s3_endpoint = os.getenv('S3_ENDPOINT')
+
+load_dotenv()
 
 # Initialize SQS client with AWS credentials
 boto = boto3.Session(

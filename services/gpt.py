@@ -3,14 +3,19 @@ import requests
 from retrying import retry
 import json
 import tiktoken
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class GptServiceImpl:
-    MAX_RETRIES = 3
-    API_KEY = "sk-proj-sK7ff3WWXS98BPfyYEp3T3BlbkFJPQ1oNsNgdFAxFEY9uFGs"
-    URL = "https://api.openai.com/v1/chat/completions"
+    MAX_RETRIES = int(os.getenv('GPT_MAX_RETRIES', '3'))
+    API_KEY = os.getenv('OPENAI_API_KEY')
+    URL = os.getenv('OPENAI_API_URL', 'https://api.openai.com/v1/chat/completions')
 
     GENERAL_PROMPT = """
     You will be provided with a conversation formatted as:  

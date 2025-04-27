@@ -5,7 +5,6 @@ import logging
 import base
 import csv
 import re
-import csv
 import requests
 import os
 import shutil
@@ -15,25 +14,32 @@ import dialogue  # model
 from emotion import go_emotion
 from speaker import diarization
 from decimal import Decimal
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 if __name__ == '__main__':
-    Z_POP_KEY = 'SingleModelPreProcess'
-    Z_INFO_SEP = ':'
-    cache_dir = "./data"
-    raw_input_dir = "./raw"
-    asr_path = "./data/transcription.txt"
-    diarization_path = "./data/diarization.txt"
-    IDLE_COUNT = 0
+    # Get configuration from environment variables
+    Z_POP_KEY = os.getenv('REDIS_ZPOP_KEY', 'SingleModelPreProcess')
+    Z_INFO_SEP = os.getenv('REDIS_INFO_SEPARATOR', ':')
+    cache_dir = os.getenv('CACHE_DIR', './data')
+    raw_input_dir = os.getenv('RAW_INPUT_DIR', './raw')
+    asr_path = os.getenv('ASR_PATH', './data/transcription.txt')
+    diarization_path = os.getenv('DIARIZATION_PATH', './data/diarization.txt')
+    IDLE_COUNT = int(os.getenv('IDLE_COUNT', '0'))
+    MAX_IDLE_COUNT = int(os.getenv('MAX_IDLE_COUNT', '5'))
+    LAMBDA_URL = os.getenv('STOP_ANALYSIS_LAMBDA_URL', 'https://z7n6sy6bqbgq4hmuapnsvdjko40nknxl.lambda-url.us-east-2.on.aws/lts/stop/analysis')
     
     while True:
-        local_cached_video_path=""
-        start_time=time.time()
+        local_cached_video_path = ""
+        start_time = time.time()
         
         resource_info = base.redis_instance.zpopmin(Z_POP_KEY)
         # [(b'meeting146:test/video/gitlab_video_2.mp4:0.6', 1709577847.4095476)]
         
-        if IDLE_COUNT > 5: 
-            res = requests.get("https://z7n6sy6bqbgq4hmuapnsvdjko40nknxl.lambda-url.us-east-2.on.aws/lts/stop/analysis")
+        if IDLE_COUNT > MAX_IDLE_COUNT: 
+            res = requests.get(LAMBDA_URL)
             print(res)
             break
 

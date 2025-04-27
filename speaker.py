@@ -3,8 +3,13 @@ import os
 
 import torch
 from pyannote.audio import Pipeline
+from dotenv import load_dotenv
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+load_dotenv()
+
+auth_token = os.getenv("PYANNOTE_AUTH_TOKEN")
 
 if torch.cuda.is_available():
     device = torch.device(0)
@@ -13,7 +18,7 @@ else:
 
 ANNOTE_PIPELINE = Pipeline.from_pretrained(
     "pyannote/speaker-diarization-3.1",
-    use_auth_token="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",
+    use_auth_token=auth_token,
 )
 ANNOTE_PIPELINE.to(torch.device(device))
 
