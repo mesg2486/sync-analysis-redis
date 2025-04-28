@@ -184,7 +184,8 @@ def upload_resource(filename, key, bucket_name='syneurgy-prod'):
 # RETURN THE S3 INSTANCE
 def get_s3_instance():
     # init s3
-    s3_instance = boto3.client(service_name='s3', region_name='us-west-1', endpoint_url='https://s3.us-west-1.amazonaws.com', aws_access_key_id='AKIATRKQV5SYSXUS7FGQ', aws_secret_access_key='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')
+    s3_instance = boto3.client(service_name='s3', region_name='us-west-1', endpoint_url='https://s3.us-west-1.amazonaws.com', aws_access_key_id=aws_access_key_id, 
+                               aws_secret_access_key=aws_secret_access_key)
     return s3_instance
 
 
